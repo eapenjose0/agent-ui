@@ -496,11 +496,12 @@ class ApiService {
           window.dispatchEvent(new CustomEvent('auth_failure'));
         }
       } else {
-        // Handle other errors
+        // Handle other errors - ensure consistent format for all error messages
         onData({ 
           status: 'error', 
-          message: error.message,
-          event_type: 'error' 
+          message: `Error in streaming response: ${error.message}`,
+          event_type: 'error',
+          detail: error.stack || 'No additional details available' 
         });
       }
       
@@ -532,6 +533,14 @@ class ApiService {
     // Add event_type for backward compatibility
     if (eventData.event && !eventData.event_type) {
       eventData.event_type = eventData.event;
+    }
+    
+    // If we have a partial_result event, mark it appropriately
+    if (eventData.event === 'partial_result' || 
+        (eventData.data && eventData.data.event_type === 'partial_result') ||
+        (eventData.data && eventData.data.type === 'partial_result')) {
+      eventData.status = 'partial_result';
+      eventData.event_type = 'partial_result';
     }
     
     // If we have a status but no event_type, infer it
@@ -582,6 +591,23 @@ class ApiService {
           result.result = eventData.data.content;
         }
       }
+      
+      // Extract conversation_id from various possible locations
+      // Check all possible paths for conversation_id
+      if (eventData.data.conversation_id) {
+        result.conversation_id = eventData.data.conversation_id;
+      } else if (eventData.data.data && eventData.data.data.conversation_id) {
+        result.conversation_id = eventData.data.data.conversation_id;
+      } else if (eventData.conversation_id) {
+        result.conversation_id = eventData.conversation_id;
+      }
+      
+      // For tools API response format
+      if (!result.conversation_id && eventData.data.result && typeof eventData.data.result === 'object') {
+        if (eventData.data.result.conversation_id) {
+          result.conversation_id = eventData.data.result.conversation_id;
+        }
+      }
     } else if (typeof eventData.data === 'string') {
       // Try to parse as JSON first
       try {
@@ -589,6 +615,13 @@ class ApiService {
         // Check if parsed result has content field
         if (result.content && result.result === undefined) {
           result.result = result.content;
+        }
+        
+        // Check if parsed data contains conversation_id
+        if (result.conversation_id) {
+          // Already have conversation_id
+        } else if (result.data && result.data.conversation_id) {
+          result.conversation_id = result.data.conversation_id;
         }
       } catch (e) {
         // If not JSON, wrap in a result object
@@ -607,6 +640,13 @@ class ApiService {
     // Ensure conversation_id is present in the result if it exists in the original data
     if (eventData.data.conversation_id && !result.conversation_id) {
       result.conversation_id = eventData.data.conversation_id;
+    } else if (eventData.conversation_id && !result.conversation_id) {
+      result.conversation_id = eventData.conversation_id;
+    }
+    
+    console.log("Extracted result:", result);
+    if (result.conversation_id) {
+      console.log("Found conversation_id:", result.conversation_id);
     }
     
     return result;
@@ -616,6 +656,48 @@ class ApiService {
   _processEventData(eventData) {
     // Make a copy to avoid modifying the original
     const data = { ...eventData };
+    
+    // Handle error events consistently
+    if (data.status === 'error' || data.event_type === 'error') {
+      // Ensure both status and event_type are set for errors
+      data.status = 'error';
+      data.event_type = 'error';
+      
+      // Make sure we have a message
+      if (!data.message && data.detail) {
+        data.message = data.detail;
+      } else if (!data.message && !data.detail) {
+        data.message = 'An error occurred during processing.';
+      }
+      
+      return data;
+    }
+    
+    // Handle partial_result events consistently
+    if (data.status === 'partial_result' || data.event_type === 'partial_result' ||
+        (data.data && data.data.type === 'partial_result')) {
+      // Ensure consistent status and event_type
+      data.status = 'partial_result';
+      data.event_type = 'partial_result';
+      
+      // Make sure content is accessible in a consistent location
+      if (!data.data) data.data = {};
+      
+      // Extract content from various possible locations
+      if (typeof data.data === 'string') {
+        data.data = { content: data.data };
+      } else if (data.data && !data.data.content) {
+        if (data.data.delta) {
+          data.data.content = data.data.delta;
+        } else if (data.data.message) {
+          data.data.content = data.data.message;
+        } else if (data.data.text) {
+          data.data.content = data.data.text;
+        }
+      }
+      
+      return data;
+    }
     
     // If this is a tool call, ensure the format is consistent
     if (data.event_type === 'agent_thinks' || data.status === 'tool_call') {

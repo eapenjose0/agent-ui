@@ -1,6 +1,6 @@
 import React from 'react';
 import { Box, Paper, Typography, Avatar } from '@mui/material';
-import { SmartToy, Person, Psychology, Science } from '@mui/icons-material';
+import { SmartToy, Person, Psychology, Science, Lock } from '@mui/icons-material';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import rehypeRaw from 'rehype-raw';
@@ -63,26 +63,55 @@ const ChatMessage = ({ message, agentType = 'om_assistant' }) => {
   // Get the right icon and color based on the agent type
   const getAgentIcon = () => {
     if (isUser) return <Person />;
-    return agentType === 'om_assistant' ? <Psychology /> : <Science />;
+    if (agentType === 'market_agent') return <Science />;
+    if (agentType === 'vault_agent') return <Lock />;
+    return <SmartToy />; // Default fallback
   };
 
   const getAgentName = () => {
     if (isUser) return 'You';
-    return agentType === 'om_assistant' ? 'Assistant' : 'Appetite Agent';
+    if (agentType === 'market_agent') return 'Market Agent';
+    if (agentType === 'vault_agent') return 'Vault Agent';
+    return 'Agent'; // Default fallback
   };
 
   const getAgentColor = () => {
     if (isUser) return 'primary.main';
-    return agentType === 'om_assistant' ? 'primary.dark' : 'secondary.dark';
+    if (agentType === 'market_agent') return 'secondary.dark';
+    if (agentType === 'vault_agent') return '#6A1B9A'; // Purple for Vault Agent
+    return 'secondary.dark'; // Default fallback
   };
 
   // Format the content
   const formattedContent = formatContent(content);
 
+  // Check if the message is an error
+  const isErrorMessage = formattedContent.includes('## ❌ Error');
+
   // Custom components for enhanced markdown rendering
   const components = {
     code({ node, inline, className, children, ...props }) {
       const match = /language-(\w+)/.exec(className || '');
+      // Special styling for error code blocks
+      if (match && match[1] === 'error') {
+        return (
+          <div style={{
+            backgroundColor: '#ffebee',
+            border: '1px solid #f44336',
+            borderRadius: '8px',
+            padding: '12px',
+            margin: '8px 0',
+            color: '#c62828',
+            fontFamily: 'SF Mono, Menlo, Monaco, monospace',
+            fontSize: '0.85rem',
+            whiteSpace: 'pre-wrap',
+            wordBreak: 'break-word'
+          }}>
+            {String(children).replace(/\n$/, '')}
+          </div>
+        );
+      }
+      
       return !inline && match ? (
         <SyntaxHighlighter
           style={materialLight}
@@ -173,14 +202,21 @@ const ChatMessage = ({ message, agentType = 'om_assistant' }) => {
           borderRadius: '16px', // More rounded corners for Mac-like appearance
           bgcolor: isUser 
             ? '#f0f0f0' 
-            : (agentType === 'om_assistant' ? '#fff8f6' : '#f8fffa'),
+            : (isErrorMessage 
+               ? '#fff5f5' // Light red background for error messages 
+               : (agentType === 'market_agent' ? '#f8fffa' : 
+                  agentType === 'vault_agent' ? '#f8f5ff' : '#f8fffa')),
           color: '#333333', // Dark gray text for better readability
-          borderLeft: 'none',
+          borderLeft: isErrorMessage ? '3px solid #f44336' : 'none', // Red border for errors
           position: 'relative',
           zIndex: 2,
-          boxShadow: '0px 1px 3px rgba(0, 0, 0, 0.08)',
+          boxShadow: isErrorMessage 
+            ? '0px 1px 3px rgba(244, 67, 54, 0.2)' 
+            : '0px 1px 3px rgba(0, 0, 0, 0.08)',
           '&:hover': {
-            boxShadow: '0px 2px 5px rgba(0, 0, 0, 0.05)', // Subtle shadow on hover
+            boxShadow: isErrorMessage 
+              ? '0px 2px 5px rgba(244, 67, 54, 0.15)' 
+              : '0px 2px 5px rgba(0, 0, 0, 0.05)', // Subtle shadow on hover
           },
         }}
       >
@@ -188,7 +224,8 @@ const ChatMessage = ({ message, agentType = 'om_assistant' }) => {
           variant="subtitle2" 
           color={isUser 
             ? '#666666' 
-            : (agentType === 'om_assistant' ? '#FF5722' : '#10B981')
+            : (agentType === 'market_agent' ? '#10B981' : 
+               agentType === 'vault_agent' ? '#6A1B9A' : '#10B981')
           } 
           gutterBottom
           fontWeight="600"
@@ -218,14 +255,16 @@ const ChatMessage = ({ message, agentType = 'om_assistant' }) => {
             borderRadius: '3px',
           },
           '& a': {
-            color: agentType === 'om_assistant' ? '#FF5722' : '#10B981',
+            color: agentType === 'market_agent' ? '#10B981' : 
+                  agentType === 'vault_agent' ? '#6A1B9A' : '#10B981',
             textDecoration: 'none',
             '&:hover': {
               textDecoration: 'underline',
             }
           },
           '& blockquote': {
-            borderLeft: `3px solid ${agentType === 'om_assistant' ? '#ffe0d3' : '#e2f9ef'}`,
+            borderLeft: `3px solid ${agentType === 'market_agent' ? '#e2f9ef' : 
+                                    agentType === 'vault_agent' ? '#e6d8f5' : '#e2f9ef'}`,
             paddingLeft: '10px',
             color: '#666666', // Medium gray for blockquotes
             margin: '0.5rem 0',

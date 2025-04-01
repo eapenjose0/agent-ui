@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { 
   Box, 
   Container, 
@@ -28,7 +28,8 @@ import {
   Description, 
   Code, 
   BarChart,
-  AddCircleOutline
+  AddCircleOutline,
+  Lock
 } from '@mui/icons-material';
 import Chat from '../components/Chat';
 import Settings from '../components/Settings';
@@ -38,7 +39,18 @@ import Footer from '../components/Footer';
 
 // Create a child component that has access to the ChatContext
 const ChatTab = ({ selectedAgent, tabIndex }) => {
-  const { clearChat } = useChat();
+  const { clearChat, setChatHistory } = useChat();
+  const prevAgentRef = useRef(selectedAgent);
+  
+  // Reset chat history when agent changes
+  useEffect(() => {
+    if (prevAgentRef.current !== selectedAgent) {
+      // Agent has changed, clear the chat
+      setChatHistory([]);
+      console.log(`Agent changed from ${prevAgentRef.current} to ${selectedAgent}, clearing chat history`);
+      prevAgentRef.current = selectedAgent;
+    }
+  }, [selectedAgent, setChatHistory]);
   
   // This component will only be rendered when the Chat tab is active
   return (
@@ -54,15 +66,16 @@ const ChatTab = ({ selectedAgent, tabIndex }) => {
         display: 'flex',
       }}
     >
-      {tabIndex === 0 && <Chat selectedAgent={selectedAgent} />}
+      {tabIndex === 0 && <Chat selectedAgent={selectedAgent} key={selectedAgent} />}
     </Box>
   );
 };
 
 const Dashboard = () => {
   const [tabIndex, setTabIndex] = useState(0);
-  const [selectedAgent, setSelectedAgent] = useState('om_assistant');
+  const [selectedAgent, setSelectedAgent] = useState('market_agent');
   const chatProviderRef = useRef(null);
+  const previousAgentRef = useRef(selectedAgent);
   
   const handleTabChange = (event, newValue) => {
     setTabIndex(newValue);
@@ -70,7 +83,24 @@ const Dashboard = () => {
   
   const handleAgentChange = (event, newAgent) => {
     if (newAgent !== null) {
+      // Store the current agent before changing
+      previousAgentRef.current = selectedAgent;
       setSelectedAgent(newAgent);
+      
+      // Clear chat when changing agents
+      clearChat();
+    }
+  };
+  
+  // Handle agent selection from the list
+  const selectAgent = (agentId) => {
+    if (agentId !== selectedAgent) {
+      // Store the current agent before changing
+      previousAgentRef.current = selectedAgent;
+      setSelectedAgent(agentId);
+      
+      // Clear chat when changing agents
+      clearChat();
     }
   };
   
@@ -91,9 +121,26 @@ const Dashboard = () => {
     document.dispatchEvent(new CustomEvent('clearChat'));
   };
   
+  // Clear chat and start a new conversation
+  const clearChat = () => {
+    // Reset conversation ID for the current agent
+    if (window.apiService) {
+      window.apiService.setConversationId(selectedAgent, null);
+    }
+    
+    // The actual chat clearing is handled in the ChatProvider's clearChat method
+    document.dispatchEvent(new CustomEvent('clearChat'));
+    console.log('Cleared chat and started new conversation with', getAgentDisplayName());
+  };
+  
   // Get agent display name
   const getAgentDisplayName = () => {
-    return selectedAgent === 'om_assistant' ? 'Assistant' : 'Appetite Agent';
+    if (selectedAgent === 'market_agent') {
+      return 'Market Agent';
+    } else if (selectedAgent === 'vault_agent') {
+      return 'Vault Agent';
+    }
+    return 'Agent'; // Default fallback
   };
   
   return (
@@ -122,85 +169,10 @@ const Dashboard = () => {
                 Agent Tools
               </Typography>
               
-              {/* Agent Selector */}
-              <Box sx={{ mb: 3.5 }}>
-                <Typography variant="subtitle2" gutterBottom sx={{ color: '#666666', fontWeight: 500, fontSize: '0.9rem', mb: 1 }}>
-                  Select an AI Agent:
-                </Typography>
-                <ToggleButtonGroup
-                  value={selectedAgent}
-                  exclusive
-                  onChange={handleAgentChange}
-                  aria-label="selected agent"
-                  color="primary"
-                  size="medium"
-                  fullWidth
-                  sx={{ 
-                    mb: 2,
-                    '& .MuiToggleButton-root': {
-                      color: '#666666',
-                      borderColor: '#e0e0e0',
-                      fontWeight: 500,
-                      fontSize: '0.9rem',
-                      py: 1,
-                      '&:hover': {
-                        backgroundColor: '#fff8f6',
-                      }
-                    }
-                  }}
-                >
-                  <ToggleButton 
-                    value="om_assistant" 
-                    aria-label="Assistant"
-                    sx={{ 
-                      '&.Mui-selected': {
-                        backgroundColor: '#fff0eb',
-                        color: '#FF5722',
-                        '&:hover': {
-                          backgroundColor: '#ffe8e0',
-                        }
-                      }
-                    }}
-                  >
-                    <Psychology sx={{ mr: 1, fontSize: '1.1rem' }} />
-                    Assistant
-                  </ToggleButton>
-                  <ToggleButton 
-                    value="appetite_agent" 
-                    aria-label="Appetite Agent"
-                    sx={{ 
-                      '&.Mui-selected': {
-                        backgroundColor: '#f0fcf9',
-                        color: '#10B981',
-                        '&:hover': {
-                          backgroundColor: '#e6f7f3',
-                        }
-                      }
-                    }}
-                  >
-                    <Science sx={{ mr: 1, fontSize: '1.1rem' }} />
-                    Appetite Agent
-                  </ToggleButton>
-                </ToggleButtonGroup>
-                <Chip 
-                  label={`Active: ${getAgentDisplayName()}`} 
-                  color={selectedAgent === 'om_assistant' ? 'primary' : 'secondary'}
-                  size="medium"
-                  sx={{
-                    backgroundColor: selectedAgent === 'om_assistant' ? '#fff0eb' : '#f0fcf9',
-                    color: selectedAgent === 'om_assistant' ? '#FF5722' : '#10B981',
-                    fontWeight: 500,
-                    fontSize: '0.85rem',
-                    py: 0.5,
-                    border: `1px solid ${selectedAgent === 'om_assistant' ? '#ffe0d3' : '#e6f7f3'}`,
-                    width: '100%',
-                    justifyContent: 'center'
-                  }}
-                />
-              </Box>
-              
               <Accordion 
                 defaultExpanded
+                expanded={true}
+                disableGutters
                 elevation={0}
                 sx={{ 
                   mb: 2,
@@ -222,10 +194,10 @@ const Dashboard = () => {
                 }}
               >
                 <AccordionSummary 
-                  expandIcon={<ExpandMore />}
                   sx={{
                     backgroundColor: '#fafafa',
                     borderRadius: '8px',
+                    pointerEvents: 'none', // Disable clicking
                   }}
                 >
                   <Typography sx={{ fontSize: '0.95rem', fontWeight: 600, color: '#555555' }}>
@@ -241,25 +213,44 @@ const Dashboard = () => {
                         py: 1, 
                         borderRadius: '8px',
                         '&:hover': { 
-                          backgroundColor: selectedAgent === 'om_assistant' ? 'rgba(255, 87, 34, 0.04)' : 'rgba(0, 0, 0, 0.02)' 
+                          backgroundColor: selectedAgent === 'market_agent' ? 'rgba(16, 185, 129, 0.04)' : 'rgba(0, 0, 0, 0.02)' 
                         },
-                        backgroundColor: selectedAgent === 'om_assistant' ? 'rgba(255, 87, 34, 0.08)' : 'transparent',
-                        transition: 'background-color 0.2s ease'
+                        backgroundColor: selectedAgent === 'market_agent' ? 'rgba(16, 185, 129, 0.08)' : 'transparent',
+                        transition: 'background-color 0.2s ease',
+                        position: 'relative',
+                        borderLeft: selectedAgent === 'market_agent' ? '3px solid #10B981' : 'none',
+                        cursor: 'pointer'
                       }}
-                      onClick={() => setSelectedAgent('om_assistant')}
+                      onClick={() => selectAgent('market_agent')}
                     >
                       <ListItemIcon>
-                        <Psychology color="primary" fontSize="small" sx={{ fontSize: '1.3rem' }} />
+                        <Science color="secondary" fontSize="small" sx={{ fontSize: '1.3rem' }} />
                       </ListItemIcon>
                       <ListItemText
                         primary={
-                          <Typography sx={{ fontSize: '0.95rem', fontWeight: 600 }}>
-                            Assistant
-                          </Typography>
+                          <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                            <Typography sx={{ fontSize: '0.95rem', fontWeight: 600 }}>
+                              Market Agent
+                            </Typography>
+                            {selectedAgent === 'market_agent' && (
+                              <Chip 
+                                label="Active" 
+                                size="small"
+                                sx={{
+                                  ml: 1,
+                                  height: '18px',
+                                  fontSize: '0.65rem',
+                                  backgroundColor: '#10B981',
+                                  color: 'white',
+                                  fontWeight: 500,
+                                }}
+                              />
+                            )}
+                          </Box>
                         }
                         secondary={
                           <Typography sx={{ fontSize: '0.85rem', color: '#666666', mt: 0.5 }}>
-                            General purpose assistant for everyday tasks. Ideal for general inquiries and information gathering.
+                            Specialized agent for market research and analysis.
                           </Typography>
                         }
                       />
@@ -272,25 +263,44 @@ const Dashboard = () => {
                         py: 1, 
                         borderRadius: '8px',
                         '&:hover': { 
-                          backgroundColor: selectedAgent === 'appetite_agent' ? 'rgba(16, 185, 129, 0.04)' : 'rgba(0, 0, 0, 0.02)' 
+                          backgroundColor: selectedAgent === 'vault_agent' ? 'rgba(106, 27, 154, 0.04)' : 'rgba(0, 0, 0, 0.02)' 
                         },
-                        backgroundColor: selectedAgent === 'appetite_agent' ? 'rgba(16, 185, 129, 0.08)' : 'transparent',
-                        transition: 'background-color 0.2s ease'
+                        backgroundColor: selectedAgent === 'vault_agent' ? 'rgba(106, 27, 154, 0.08)' : 'transparent',
+                        transition: 'background-color 0.2s ease',
+                        position: 'relative',
+                        borderLeft: selectedAgent === 'vault_agent' ? '3px solid #6A1B9A' : 'none',
+                        cursor: 'pointer'
                       }}
-                      onClick={() => setSelectedAgent('appetite_agent')}
+                      onClick={() => selectAgent('vault_agent')}
                     >
                       <ListItemIcon>
-                        <Science color="secondary" fontSize="small" sx={{ fontSize: '1.3rem' }} />
+                        <Lock sx={{ color: '#6A1B9A', fontSize: '1.3rem' }} />
                       </ListItemIcon>
                       <ListItemText
                         primary={
-                          <Typography sx={{ fontSize: '0.95rem', fontWeight: 600 }}>
-                            Appetite Agent
-                          </Typography>
+                          <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                            <Typography sx={{ fontSize: '0.95rem', fontWeight: 600 }}>
+                              Vault Agent
+                            </Typography>
+                            {selectedAgent === 'vault_agent' && (
+                              <Chip 
+                                label="Active" 
+                                size="small"
+                                sx={{
+                                  ml: 1,
+                                  height: '18px',
+                                  fontSize: '0.65rem',
+                                  backgroundColor: '#6A1B9A',
+                                  color: 'white',
+                                  fontWeight: 500,
+                                }}
+                              />
+                            )}
+                          </Box>
                         }
                         secondary={
                           <Typography sx={{ fontSize: '0.85rem', color: '#666666', mt: 0.5 }}>
-                            Specialized agent for insurance carrier exploration and appetite analysis.
+                            Specialized agent for document analysis and Q&A assistant.
                           </Typography>
                         }
                       />
@@ -398,9 +408,24 @@ const Dashboard = () => {
                   justifyContent: 'space-between',
                 }}
               >
-                <Box sx={{ display: 'flex' }}>
+                <Box sx={{ display: 'flex', alignItems: 'center' }}>
                   <Tab label="Chat" />
                   <Tab label="History" />
+                  {tabIndex === 0 && (
+                    <Chip 
+                      label={`Using: ${getAgentDisplayName()}`} 
+                      size="small"
+                      sx={{
+                        ml: 2,
+                        backgroundColor: selectedAgent === 'market_agent' ? '#f0fcf9' : '#f8f5ff',
+                        color: selectedAgent === 'market_agent' ? '#10B981' : '#6A1B9A',
+                        fontWeight: 500,
+                        fontSize: '0.75rem',
+                        border: `1px solid ${selectedAgent === 'market_agent' ? '#e6f7f3' : '#e6d8f5'}`,
+                        height: '24px'
+                      }}
+                    />
+                  )}
                 </Box>
                 
                 {/* New Chat button - Mac style */}
@@ -410,7 +435,8 @@ const Dashboard = () => {
                     size="small"
                     sx={{
                       backgroundColor: 'rgba(0,0,0,0.03)',
-                      color: selectedAgent === 'om_assistant' ? '#FF5722' : '#10B981',
+                      color: selectedAgent === 'market_agent' ? '#10B981' : 
+                            selectedAgent === 'vault_agent' ? '#6A1B9A' : '#10B981',
                       fontSize: '0.85rem',
                       padding: '4px 10px',
                       borderRadius: '16px',
@@ -422,7 +448,8 @@ const Dashboard = () => {
                       border: '1px solid rgba(0,0,0,0.05)',
                       boxShadow: '0px 1px 2px rgba(0,0,0,0.02)',
                       '&:hover': {
-                        backgroundColor: selectedAgent === 'om_assistant' ? 'rgba(255, 87, 34, 0.08)' : 'rgba(16, 185, 129, 0.08)',
+                        backgroundColor: selectedAgent === 'market_agent' ? 'rgba(16, 185, 129, 0.08)' : 
+                                        selectedAgent === 'vault_agent' ? 'rgba(106, 27, 154, 0.08)' : 'rgba(16, 185, 129, 0.08)',
                         boxShadow: '0px 1px 3px rgba(0,0,0,0.05)',
                       }
                     }}

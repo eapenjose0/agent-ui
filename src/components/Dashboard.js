@@ -15,17 +15,17 @@
     <AccordionDetails>
       <Box>
         <Typography variant="subtitle1" fontWeight="bold" gutterBottom>
-          OM Assistant
+          Market Agent
         </Typography>
         <Typography variant="body1" paragraph>
-          The general-purpose assistant for answering questions, writing content, and helping with research tasks.
+          Specialized in market research, analysis, and business intelligence.
         </Typography>
         
         <Typography variant="subtitle1" fontWeight="bold" gutterBottom>
-          Appetite Agent
+          Vault Agent
         </Typography>
         <Typography variant="body1" paragraph>
-          Specialized in food-related queries, recipes, and nutrition information.
+          Specialized in handling sensitive information with enhanced security protocols.
         </Typography>
       </Box>
     </AccordionDetails>
@@ -60,8 +60,8 @@
       <Box component="div" sx={{ ml: 2 }}>
         <ul>
           <li>Be specific in your queries</li>
-          <li>Use the OM Assistant for general questions</li>
-          <li>Use the Appetite Agent for food-related queries</li>
+          <li>Use the Market Agent for market research and analysis</li>
+          <li>Use the Vault Agent for secure and sensitive communications</li>
         </ul>
       </Box>
     </AccordionDetails>

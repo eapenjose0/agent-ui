@@ -16,6 +16,8 @@ const Chat = ({ selectedAgent }) => {
   const [message, setMessage] = useState('');
   const [sending, setSending] = useState(false);
   const messagesEndRef = useRef(null);
+  const prevAgentRef = useRef(selectedAgent);
+  const fullResponseRef = useRef(''); // Ref to keep track of the full response
   
   const { 
     chatHistory, 
@@ -29,6 +31,19 @@ const Chat = ({ selectedAgent }) => {
     setChatHistory,
   } = useChat();
   
+  // Reset state when agent changes
+  useEffect(() => {
+    if (prevAgentRef.current !== selectedAgent) {
+      // Agent has changed, reset component state
+      setMessage('');
+      setSending(false);
+      setIsStreaming(false);
+      setCurrentResponse('');
+      fullResponseRef.current = ''; // Reset the full response
+      prevAgentRef.current = selectedAgent;
+    }
+  }, [selectedAgent, setIsStreaming, setCurrentResponse]);
+  
   // Scroll to bottom of messages
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -40,7 +55,12 @@ const Chat = ({ selectedAgent }) => {
   
   // Get agent display name
   const getAgentDisplayName = () => {
-    return selectedAgent === 'om_assistant' ? 'Assistant' : 'Appetite Agent';
+    if (selectedAgent === 'market_agent') {
+      return 'Market Agent';
+    } else if (selectedAgent === 'vault_agent') {
+      return 'Vault Agent';
+    }
+    return 'Agent'; // Default fallback
   };
   
   // Clear chat and start a new conversation
@@ -56,56 +76,71 @@ const Chat = ({ selectedAgent }) => {
   const processStreamedData = (data) => {
     console.log("Processing streamed data:", data);
     
+    // Check if this is an error message
+    if (data.status === 'error' || data.event_type === 'error') {
+      console.error("Error detected in streaming:", data);
+      
+      // Format error message with distinctive styling
+      const errorMessage = `
+## ❌ Error
+\`\`\`error
+${data.message || data.detail || "An error occurred during processing."}
+\`\`\`
+`;
+      
+      // Clear previous content and set error message
+      fullResponseRef.current = errorMessage;
+      setCurrentResponse(errorMessage);
+      updateLatestAssistantMessage(errorMessage);
+      setIsStreaming(false);
+      return;
+    }
+    
+    // Handle partial_result: always start fresh with this content
+    if (data.status === 'partial_result' || data.event_type === 'partial_result') {
+      console.log("Partial result received:", data);
+      
+      let partialContent = '';
+      
+      // Try to extract content from data based on the standardized format from API service
+      if (data.data) {
+        if (typeof data.data === 'object' && data.data.content) {
+          partialContent = data.data.content;
+        } else if (typeof data.data === 'string') {
+          partialContent = data.data;
+        }
+      } else if (data.content) {
+        partialContent = data.content;
+      }
+      
+      if (partialContent) {
+        // For partial results, always start fresh - don't append to previous content
+        fullResponseRef.current = partialContent;
+        
+        // Update UI with the new content
+        console.log("Setting fresh partial content:", fullResponseRef.current);
+        setCurrentResponse(fullResponseRef.current);
+        updateLatestAssistantMessage(fullResponseRef.current);
+      }
+      
+      return;
+    }
+    
     // Check if this is a completion message
     if (data.status === 'completed') {
       console.log("Completion detected, data:", data);
       
-      let result = null;
-      
-      // Try to extract result from data
-      if (data.data) {
-        if (typeof data.data === 'object') {
-          // Check if there's a content field - prioritize this for response display
-          if (data.data.content) {
-            result = data.data.content;
-            console.log("Using content field for response:", result);
-          } 
-          // Check if there's a result field
-          else if (data.data.result) {
-            result = data.data.result;
-          } else {
-            // If no specific result field, use the whole data object
-            result = data.data;
-          }
-        } else if (typeof data.data === 'string') {
-          // If data is a string, use it directly
-          result = data.data;
-        } else {
-          // If data is something else, convert to string
-          try {
-            result = JSON.stringify(data.data);
-          } catch (e) {
-            result = "Operation completed successfully.";
-          }
-        }
-      } else if (data.result) {
-        // Sometimes the result might be directly in the top-level object
-        result = data.result;
-      } else if (data.content) {
-        // Sometimes the content might be directly in the top-level object
-        result = data.content;
+      // Only extract and save conversation_id without updating UI content
+      if (data.data && data.data.conversation_id) {
+        // Store the conversation ID for future requests
+        apiService.setConversationId(selectedAgent, data.data.conversation_id);
+        console.log(`Saved conversation ID: ${data.data.conversation_id} for ${selectedAgent}`);
+      } else if (data.conversation_id) {
+        apiService.setConversationId(selectedAgent, data.conversation_id);
+        console.log(`Saved conversation ID: ${data.conversation_id} for ${selectedAgent}`);
       }
       
-      // Process the result
-      if (result) {
-        console.log("Completion result:", result);
-        // Update the messages with the completion
-        setCurrentResponse(result);
-        updateLatestAssistantMessage(result);
-      } else {
-        console.log("No result found in completion data");
-      }
-      
+      // For completion, don't clear or update the content
       setIsStreaming(false);
       return;
     }
@@ -122,15 +157,17 @@ const Chat = ({ selectedAgent }) => {
       
       // Format the response for display
       const response = `
-### 🤔 Thinking...
+### Thinking...
 ${aiContent}
 
-### 🛠️ Using tool: \`${toolName}\`
+#### Tool: \`${toolName}\`
 \`\`\`json
 ${JSON.stringify(toolInput, null, 2)}
 \`\`\`
 `;
       
+      // Clear previous content and set tool call info
+      fullResponseRef.current = response;
       setCurrentResponse(response);
       updateLatestAssistantMessage(response);
       return;
@@ -139,6 +176,9 @@ ${JSON.stringify(toolInput, null, 2)}
     // Handle regular agent message updates
     if (data.event_type === 'agent_message' && data.data) {
       const messageContent = data.data.content || data.data;
+      
+      // Clear previous content and set agent message
+      fullResponseRef.current = messageContent;
       setCurrentResponse(messageContent);
       updateLatestAssistantMessage(messageContent);
       return;
@@ -149,7 +189,9 @@ ${JSON.stringify(toolInput, null, 2)}
       const statusMsg = data.detail
         ? `⚙️ Status: ${data.status} - ${data.detail}`
         : `⚙️ Status: ${data.status}`;
-        
+      
+      // Clear previous content and set status message
+      fullResponseRef.current = statusMsg;
       setCurrentResponse(statusMsg);
       updateLatestAssistantMessage(statusMsg);
     }
@@ -165,6 +207,9 @@ ${JSON.stringify(toolInput, null, 2)}
     setSending(true);
     setIsStreaming(true);
     
+    // Reset the full response ref
+    fullResponseRef.current = '';
+    
     // Add user message to chat
     addUserMessage(message);
     
@@ -172,6 +217,7 @@ ${JSON.stringify(toolInput, null, 2)}
     const initialResponse = `⏳ Processing your request with ${getAgentDisplayName()}... Please wait.`;
     addAssistantMessage(initialResponse);
     setCurrentResponse(initialResponse);
+    fullResponseRef.current = initialResponse; // Initialize the full response with the initial message
     
     try {
       console.log(`Sending message to ${selectedAgent} with current message: ${message.substring(0, 50)}...`);
@@ -312,7 +358,8 @@ ${JSON.stringify(toolInput, null, 2)}
             py: 0.75,
             borderRadius: '6px',
             bgcolor: 'rgba(0, 0, 0, 0.03)',
-            color: selectedAgent === 'om_assistant' ? '#FF5722' : '#10B981',
+            color: selectedAgent === 'market_agent' ? '#10B981' : 
+                  selectedAgent === 'vault_agent' ? '#6A1B9A' : '#10B981',
             position: 'relative',
             zIndex: 10,
           }}
@@ -320,7 +367,9 @@ ${JSON.stringify(toolInput, null, 2)}
           <Typography variant="caption" component="span" sx={{ fontWeight: 500, fontSize: '0.8rem' }}>
             {getAgentDisplayName()} is responding...
           </Typography>
-          <CircularProgress size={12} sx={{ ml: 1 }} color={selectedAgent === 'om_assistant' ? 'primary' : 'secondary'} />
+          <CircularProgress size={12} sx={{ ml: 1 }} 
+            color={selectedAgent === 'market_agent' ? 'secondary' : 'secondary'} 
+          />
         </Box>
       )}
       
@@ -363,9 +412,11 @@ ${JSON.stringify(toolInput, null, 2)}
                 },
                 '&:focus-within': {
                   bgcolor: 'rgba(0, 0, 0, 0.04)',
-                  boxShadow: selectedAgent === 'om_assistant' 
-                    ? '0 0 0 2px rgba(255, 87, 34, 0.1)' 
-                    : '0 0 0 2px rgba(16, 185, 129, 0.1)',
+                  boxShadow: selectedAgent === 'market_agent'
+                    ? '0 0 0 2px rgba(16, 185, 129, 0.1)'
+                    : selectedAgent === 'vault_agent'
+                      ? '0 0 0 2px rgba(106, 27, 154, 0.1)'
+                      : '0 0 0 2px rgba(16, 185, 129, 0.1)',
                 }
               }}
             >
@@ -421,7 +472,8 @@ ${JSON.stringify(toolInput, null, 2)}
                     disabled={!message.trim() || isStreaming}
                     sx={{ 
                       bgcolor: message.trim() && !isStreaming 
-                        ? (selectedAgent === 'om_assistant' ? '#FF5722' : '#10B981')
+                        ? (selectedAgent === 'market_agent' ? '#10B981' : 
+                           selectedAgent === 'vault_agent' ? '#6A1B9A' : '#10B981')
                         : 'transparent',
                       color: message.trim() && !isStreaming 
                         ? 'white'
@@ -432,7 +484,8 @@ ${JSON.stringify(toolInput, null, 2)}
                       transition: 'all 0.2s',
                       '&:hover': {
                         bgcolor: message.trim() && !isStreaming 
-                          ? (selectedAgent === 'om_assistant' ? '#E64A19' : '#059669')
+                          ? (selectedAgent === 'market_agent' ? '#059669' : 
+                             selectedAgent === 'vault_agent' ? '#4A148C' : '#059669')
                           : 'rgba(0, 0, 0, 0.04)',
                       },
                       '&.Mui-disabled': {
@@ -454,14 +507,18 @@ ${JSON.stringify(toolInput, null, 2)}
                 width: 28,
                 borderRadius: '50%',
                 color: isStreaming 
-                  ? (selectedAgent === 'om_assistant' ? '#FF5722' : '#10B981')
+                  ? (selectedAgent === 'market_agent' ? '#10B981' : 
+                     selectedAgent === 'vault_agent' ? '#6A1B9A' : '#10B981')
                   : '#d0d0d0',
                 transition: 'all 0.2s',
                 '&.Mui-disabled': {
                   color: '#e0e0e0',
                 },
                 '&:hover': {
-                  backgroundColor: isStreaming ? 'rgba(255, 87, 34, 0.04)' : 'rgba(0, 0, 0, 0.04)'
+                  backgroundColor: isStreaming 
+                    ? (selectedAgent === 'market_agent' ? 'rgba(16, 185, 129, 0.04)' : 
+                       selectedAgent === 'vault_agent' ? 'rgba(106, 27, 154, 0.04)' : 'rgba(16, 185, 129, 0.04)')
+                    : 'rgba(0, 0, 0, 0.04)'
                 }
               }}
             >
