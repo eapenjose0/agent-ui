@@ -59,6 +59,8 @@ const Chat = ({ selectedAgent }) => {
       return 'Market Agent';
     } else if (selectedAgent === 'vault_agent') {
       return 'Vault Agent';
+    } else if (selectedAgent === 'insights_agent') {
+      return 'Insights Agent';
     }
     return 'Agent'; // Default fallback
   };
@@ -75,6 +77,36 @@ const Chat = ({ selectedAgent }) => {
   // Process streaming data
   const processStreamedData = (data) => {
     console.log("Processing streamed data:", data);
+    
+    // Handle initializing event
+    if (data.status === 'initializing' || data.event_type === 'initializing') {
+      console.log("Initializing event received:", data);
+      
+      let initMessage = '';
+      
+      // Try to extract content from data
+      if (data.data) {
+        if (typeof data.data === 'object') {
+          initMessage = data.data.content || data.data.toString();
+        } else if (typeof data.data === 'string') {
+          initMessage = data.data;
+        }
+      } else if (data.content) {
+        initMessage = data.content;
+      }
+      
+      if (initMessage) {
+        // Format the initialization message
+        const formattedMessage = `⚙️ ${initMessage}`;
+        
+        // Update the full response and UI
+        fullResponseRef.current = formattedMessage;
+        setCurrentResponse(formattedMessage);
+        updateLatestAssistantMessage(formattedMessage);
+      }
+      
+      return;
+    }
     
     // Check if this is an error message
     if (data.status === 'error' || data.event_type === 'error') {
@@ -214,7 +246,7 @@ ${JSON.stringify(toolInput, null, 2)}
     addUserMessage(message);
     
     // Add initial AI response with agent info
-    const initialResponse = `⏳ Processing your request with ${getAgentDisplayName()}... Please wait.`;
+    const initialResponse = `⏳ Processing your request`;
     addAssistantMessage(initialResponse);
     setCurrentResponse(initialResponse);
     fullResponseRef.current = initialResponse; // Initialize the full response with the initial message

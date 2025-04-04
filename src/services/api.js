@@ -313,10 +313,8 @@ class ApiService {
       return { status: 'error', message: 'Not authenticated' };
     }
     
-    // Determine the appropriate endpoint based on whether this is a new or continuing conversation
-    const endpoint = conversationId 
-      ? `${AGENT_API_URL}/api/v1/carrier_explorer/conversations/${conversationId}/chat/stream` 
-      : `${AGENT_API_URL}/api/v1/carrier_explorer/tools/apply/stream`;
+    // Update: Single endpoint for both new and continuing conversations
+    const endpoint = `${AGENT_API_URL}/api/v1/agents/apply/stream`;
     
     console.log(`Using agent: ${agentId} for query: ${query.substring(0, 50)}${query.length > 50 ? '...' : ''}`);
     console.log(conversationId 
@@ -330,13 +328,14 @@ class ApiService {
       // Add streaming header
       headers['Accept'] = 'text/event-stream';
 
-      // Create the appropriate payload
-      const payload = conversationId 
-        ? { query } // Continuing conversation format
-        : { 
-            tool_id: agentId, 
-            input_args: { query } 
-          }; // First query format
+      // Updated payload structure to match new API requirements
+      const payload = {
+        agent_id: agentId,
+        conversation_id: conversationId, // Will be null for new conversations
+        input_args: {
+          query: query
+        }
+      };
 
       // Using fetch for SSE instead of axios
       const response = await fetch(endpoint, {

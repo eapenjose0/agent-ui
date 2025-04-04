@@ -139,6 +139,8 @@ const Dashboard = () => {
       return 'Market Agent';
     } else if (selectedAgent === 'vault_agent') {
       return 'Vault Agent';
+    } else if (selectedAgent === 'insights_agent') {
+      return 'Insights Agent';
     }
     return 'Agent'; // Default fallback
   };
@@ -305,6 +307,56 @@ const Dashboard = () => {
                         }
                       />
                     </ListItem>
+                    <Divider variant="inset" component="li" sx={{ my: 1.5 }} />
+                    <ListItem 
+                      alignItems="flex-start" 
+                      sx={{ 
+                        px: 1, 
+                        py: 1, 
+                        borderRadius: '8px',
+                        '&:hover': { 
+                          backgroundColor: selectedAgent === 'insights_agent' ? 'rgba(25, 118, 210, 0.04)' : 'rgba(0, 0, 0, 0.02)' 
+                        },
+                        backgroundColor: selectedAgent === 'insights_agent' ? 'rgba(25, 118, 210, 0.08)' : 'transparent',
+                        transition: 'background-color 0.2s ease',
+                        position: 'relative',
+                        borderLeft: selectedAgent === 'insights_agent' ? '3px solid #1976D2' : 'none',
+                        cursor: 'pointer'
+                      }}
+                      onClick={() => selectAgent('insights_agent')}
+                    >
+                      <ListItemIcon>
+                        <BarChart sx={{ color: '#1976D2', fontSize: '1.3rem' }} />
+                      </ListItemIcon>
+                      <ListItemText
+                        primary={
+                          <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                            <Typography sx={{ fontSize: '0.95rem', fontWeight: 600 }}>
+                              Insights Agent
+                            </Typography>
+                            {selectedAgent === 'insights_agent' && (
+                              <Chip 
+                                label="Active" 
+                                size="small"
+                                sx={{
+                                  ml: 1,
+                                  height: '18px',
+                                  fontSize: '0.65rem',
+                                  backgroundColor: '#1976D2',
+                                  color: 'white',
+                                  fontWeight: 500,
+                                }}
+                              />
+                            )}
+                          </Box>
+                        }
+                        secondary={
+                          <Typography sx={{ fontSize: '0.85rem', color: '#666666', mt: 0.5 }}>
+                            Specialized agent for data insights, analytics, and visualization.
+                          </Typography>
+                        }
+                      />
+                    </ListItem>
                   </List>
                 </AccordionDetails>
               </Accordion>
@@ -358,6 +410,10 @@ const Dashboard = () => {
                     <ListItem>
                       <ListItemIcon><BarChart fontSize="small" /></ListItemIcon>
                       <ListItemText primary="Data Visualization" secondary="Create charts and graphs" />
+                    </ListItem>
+                    <ListItem>
+                      <ListItemIcon><BarChart fontSize="small" /></ListItemIcon>
+                      <ListItemText primary="Data Insights" secondary="Extract meaningful insights from data" />
                     </ListItem>
                   </List>
                 </AccordionDetails>
@@ -417,11 +473,17 @@ const Dashboard = () => {
                       size="small"
                       sx={{
                         ml: 2,
-                        backgroundColor: selectedAgent === 'market_agent' ? '#f0fcf9' : '#f8f5ff',
-                        color: selectedAgent === 'market_agent' ? '#10B981' : '#6A1B9A',
+                        backgroundColor: selectedAgent === 'market_agent' ? '#f0fcf9' : 
+                                          selectedAgent === 'vault_agent' ? '#f8f5ff' : 
+                                          selectedAgent === 'insights_agent' ? '#E3F2FD' : '#f0fcf9',
+                        color: selectedAgent === 'market_agent' ? '#10B981' : 
+                               selectedAgent === 'vault_agent' ? '#6A1B9A' : 
+                               selectedAgent === 'insights_agent' ? '#1976D2' : '#10B981',
                         fontWeight: 500,
                         fontSize: '0.75rem',
-                        border: `1px solid ${selectedAgent === 'market_agent' ? '#e6f7f3' : '#e6d8f5'}`,
+                        border: `1px solid ${selectedAgent === 'market_agent' ? '#e6f7f3' : 
+                                              selectedAgent === 'vault_agent' ? '#e6d8f5' : 
+                                              selectedAgent === 'insights_agent' ? '#BBDEFB' : '#e6f7f3'}`,
                         height: '24px'
                       }}
                     />
@@ -436,7 +498,8 @@ const Dashboard = () => {
                     sx={{
                       backgroundColor: 'rgba(0,0,0,0.03)',
                       color: selectedAgent === 'market_agent' ? '#10B981' : 
-                            selectedAgent === 'vault_agent' ? '#6A1B9A' : '#10B981',
+                            selectedAgent === 'vault_agent' ? '#6A1B9A' : 
+                            selectedAgent === 'insights_agent' ? '#1976D2' : '#10B981',
                       fontSize: '0.85rem',
                       padding: '4px 10px',
                       borderRadius: '16px',
@@ -449,7 +512,8 @@ const Dashboard = () => {
                       boxShadow: '0px 1px 2px rgba(0,0,0,0.02)',
                       '&:hover': {
                         backgroundColor: selectedAgent === 'market_agent' ? 'rgba(16, 185, 129, 0.08)' : 
-                                        selectedAgent === 'vault_agent' ? 'rgba(106, 27, 154, 0.08)' : 'rgba(16, 185, 129, 0.08)',
+                                        selectedAgent === 'vault_agent' ? 'rgba(106, 27, 154, 0.08)' : 
+                                        selectedAgent === 'insights_agent' ? 'rgba(25, 118, 210, 0.08)' : 'rgba(16, 185, 129, 0.08)',
                         boxShadow: '0px 1px 3px rgba(0,0,0,0.05)',
                       }
                     }}

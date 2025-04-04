@@ -1,6 +1,6 @@
 import React from 'react';
 import { Box, Paper, Typography, Avatar } from '@mui/material';
-import { SmartToy, Person, Psychology, Science, Lock } from '@mui/icons-material';
+import { SmartToy, Person, Psychology, Science, Lock, BarChart } from '@mui/icons-material';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import rehypeRaw from 'rehype-raw';
@@ -65,6 +65,7 @@ const ChatMessage = ({ message, agentType = 'om_assistant' }) => {
     if (isUser) return <Person />;
     if (agentType === 'market_agent') return <Science />;
     if (agentType === 'vault_agent') return <Lock />;
+    if (agentType === 'insights_agent') return <BarChart />;
     return <SmartToy />; // Default fallback
   };
 
@@ -72,6 +73,7 @@ const ChatMessage = ({ message, agentType = 'om_assistant' }) => {
     if (isUser) return 'You';
     if (agentType === 'market_agent') return 'Market Agent';
     if (agentType === 'vault_agent') return 'Vault Agent';
+    if (agentType === 'insights_agent') return 'Insights Agent';
     return 'Agent'; // Default fallback
   };
 
@@ -79,6 +81,7 @@ const ChatMessage = ({ message, agentType = 'om_assistant' }) => {
     if (isUser) return 'primary.main';
     if (agentType === 'market_agent') return 'secondary.dark';
     if (agentType === 'vault_agent') return '#6A1B9A'; // Purple for Vault Agent
+    if (agentType === 'insights_agent') return '#1976D2'; // Blue for Insights Agent
     return 'secondary.dark'; // Default fallback
   };
 
